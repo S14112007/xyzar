@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zenspace AR Marketing Experience</title>
+<script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+<style>
+body { margin:0; overflow:hidden; font-family: Arial, sans-serif; }
+a-button {
+  background-color: black;
+  color: white;
+  padding: 0.5em 1em;
+  border-radius: 5px;
+  font-size: 1em;
+}
+</style>
+</head>
+<body>
+
+<a-scene
+  vr-mode-ui="enabled: true"
+  webxr="requiredFeatures: hit-test, local-floor"
+  renderer="logarithmicDepthBuffer: true;"
+>
+
+  <a-assets>
+    <a-asset-item id="chairModel" src="chair.glb"></a-asset-item>
+  </a-assets>
+
+  <!-- Camera -->
+  <a-camera position="0 1.6 0"></a-camera>
+
+  <!-- Lights -->
+  <a-light type="ambient" intensity="1"></a-light>
+  <a-light type="directional" position="1 3 2" intensity="0.5"></a-light>
+
+  <!-- Reticle -->
+  <a-ring id="reticle"
+    rotation="-90 0 0"
+    radius-inner="0.05"
+    radius-outer="0.07"
+    color="lime"
+    visible="false">
+  </a-ring>
+
+  <!-- Chair Model -->
+  <a-entity id="chair"
+    gltf-model="#chairModel"
+    scale="0.7 0.7 0.7"
+    visible="false">
+  </a-entity>
+
+  <!-- Floating Marketing Text -->
+  <a-entity id="marketingText" visible="false">
+    <a-text value="Zenspace Modern Chair" color="gold" width="2" position="0 1 0" align="center"></a-text>
+    <a-text value="★★★★★ 4.8/5" color="white" width="2" position="0 0.8 0" align="center"></a-text>
+    <a-text value="Price: ₹8,999" color="green" width="2" position="0 0.6 0" align="center"></a-text>
+    <a-text value="Limited 30% Offer!" color="red" width="2" position="0 0.4 0" align="center"></a-text>
+    <a-text value="Ergonomic, Adjustable, Modern" color="white" width="2" position="0 0.2 0" align="center"></a-text>
+    
+    <!-- Buy Now Button -->
+    <a-entity id="buyButton" position="0 0 -0.01">
+      <a-plane color="black" width="0.6" height="0.2" class="buy-btn"></a-plane>
+      <a-text value="BUY NOW" color="white" align="center" width="1.5" position="0 0 0.01"></a-text>
+    </a-entity>
+  </a-entity>
+
+  <!-- HUD Text -->
+  <a-text id="hud"
+    value="Move device to scan floor"
+    position="0 -0.5 -1"
+    align="center"
+    color="white"
+    width="2">
+  </a-text>
+
+</a-scene>
+
+<script>
+AFRAME.registerComponent('hit-test', {
+  init: function () {
+    this.reticle = document.querySelector('#reticle');
+    this.chair = document.querySelector('#chair');
+    this.marketing = document.querySelector('#marketingText');
+    this.hud = document.querySelector('#hud');
+    this.hitTestSource = null;
+    this.referenceSpace = null;
+
+    // Setup WebXR hit-test
+    this.el.sceneEl.renderer.xr.addEventListener('sessionstart', async () => {
+      const session = this.el.sceneEl.renderer.xr.getSession();
+      const viewerSpace = await session.requestReferenceSpace('viewer');
+      this.referenceSpace = await session.requestReferenceSpace('local-floor');
+      this.hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
+    });
+
+    // Tap to place chair & marketing info
+    this.el.sceneEl.addEventListener('click', () => {
+      if (this.reticle.object3D.visible) {
+        // Place chair
+        this.chair.object3D.position.copy(this.reticle.object3D.position);
+        this.chair.setAttribute('visible', true);
+
+        // Place marketing text floating above chair
+        this.marketing.object3D.position.copy(this.reticle.object3D.position);
+        this.marketing.object3D.position.y += 1.2;
+        this.marketing.setAttribute('visible', true);
+
+        // Update HUD
+        this.hud.setAttribute('value', 'Zenspace Chair Placed ✔');
+      }
+    });
+  },
+
+  tick: function () {
+    const frame = this.el.sceneEl.frame;
+    if (!frame || !this.hitTestSource) return;
+
+    const hits = frame.getHitTestResults(this.hitTestSource);
+    if (hits.length > 0) {
+      const pose = hits[0].getPose(this.referenceSpace);
+      this.reticle.object3D.position.set(
+        pose.transform.position.x,
+        pose.transform.position.y,
+        pose.transform.position.z
+      );
+      this.reticle.setAttribute('visible', true);
+      this.hud.setAttribute('value', 'Tap to place chair');
+    } else {
+      this.reticle.setAttribute('visible', false);
+      this.hud.setAttribute('value', 'Move device to scan floor');
+    }
+  }
+});
+
+document.querySelector('a-scene').setAttribute('hit-test', '');
+</script>
+
+</body>
+</html>
